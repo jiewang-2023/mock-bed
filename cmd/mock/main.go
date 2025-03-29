@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	BROKER_HOST               = "tcp://172.16.4.207:1883" // MQTT 代理服务器地址
-	USERNAME                  = "mock"                    // MQTT 用户名
-	PWD                       = "mock"                    // MQTT 密码
+	BROKER_HOST               = "tcp://localhost:1883" // MQTT 代理服务器地址
+	USERNAME                  = "mock"                 // MQTT 用户名
+	PWD                       = "mock"                 // MQTT 密码
 	CONTROL_SUB_TOPIC         = "qrem/+/control"
 	GET_BED_STATUS_SUB_TOPIC  = "qrem/+/get_bed_status"
 	HARDWARE_PUB_TOPIC        = "qrem/%s/hardware"
@@ -74,31 +74,30 @@ func main() {
 	}
 
 	// 发送心跳
-	go sendHeartBeat(macs, mqttClientMap)
-	go sendHardWareMotherboardTemperature(macs, mqttClientMap)
-	go sendHardWareSolenoidValveTemperature(macs, mqttClientMap)
-	go sendHardWareAirPumpCurrent(macs, mqttClientMap)
-	go sendHardWarePressurePad(macs, mqttClientMap)
-	go sendHardWareSolenoidValveCurrent(macs, mqttClientMap)
-	go sendErrorCode(macs, mqttClientMap)
-	go sendMPR(macs, mqttClientMap)
-	go sendGET_HARDWARE_ALL_STATUS(macs, mqttClientMap)
-	go sendGET_ALGOR_ALL_STATUS(macs, mqttClientMap)
-	go send8E(macs, mqttClientMap)
-	go sendMovement(macs, mqttClientMap)
-	go sendPosture(macs, mqttClientMap)
-	go sendBodyshape(macs, mqttClientMap)
-	go sendAdaptiveActive(macs, mqttClientMap)
-	go sendHrHRVBR(macs, mqttClientMap, 0x01)
-	go sendHrHRVBR(macs, mqttClientMap, 0x02)
+	go sendHeartBeat(mqttClientMap)
+	go sendHardWareMotherboardTemperature(mqttClientMap)
+	go sendHardWareSolenoidValveTemperature(mqttClientMap)
+	go sendHardWareAirPumpCurrent(mqttClientMap)
+	go sendHardWarePressurePad(mqttClientMap)
+	go sendHardWareSolenoidValveCurrent(mqttClientMap)
+	go sendErrorCode(mqttClientMap)
+	go sendMPR(mqttClientMap)
+	go sendGET_HARDWARE_ALL_STATUS(mqttClientMap)
+	go sendGET_ALGOR_ALL_STATUS(mqttClientMap)
+	go send8E(mqttClientMap)
+	go sendMovement(mqttClientMap)
+	go sendPosture(mqttClientMap)
+	go sendBodyshape(mqttClientMap)
+	go sendAdaptiveActive(mqttClientMap)
+	go sendHrHRVBR(mqttClientMap, 0x01)
+	go sendHrHRVBR(mqttClientMap, 0x02)
 
 	wg.Wait()
 }
 
-func sendHrHRVBR(macs []string, mqttClientMap map[string]MQTT.Client, opt byte) {
+func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x9a))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0x9a)
@@ -142,10 +141,9 @@ func sendHrHRVBR(macs []string, mqttClientMap map[string]MQTT.Client, opt byte) 
 	}
 }
 
-func sendAdaptiveActive(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x97))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0x97)
@@ -171,10 +169,9 @@ func sendAdaptiveActive(macs []string, mqttClientMap map[string]MQTT.Client) {
 	}
 }
 
-func sendBodyshape(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendBodyshape(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x8E))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0x95)
@@ -200,10 +197,9 @@ func sendBodyshape(macs []string, mqttClientMap map[string]MQTT.Client) {
 	}
 }
 
-func sendPosture(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendPosture(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public sendPosture,mac=%s,cmd=%X", mac, 0x91))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0x91)
@@ -233,10 +229,9 @@ func sendPosture(macs []string, mqttClientMap map[string]MQTT.Client) {
 	}
 }
 
-func sendMovement(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendMovement(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public sendMovement,mac=%s,cmd=%X", mac, 0x91))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0x91)
@@ -266,10 +261,9 @@ func sendMovement(macs []string, mqttClientMap map[string]MQTT.Client) {
 	}
 }
 
-func send8E(macs []string, mqttClientMap map[string]MQTT.Client) {
+func send8E(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x8E))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0x8E)
@@ -392,10 +386,9 @@ func send8E(macs []string, mqttClientMap map[string]MQTT.Client) {
 	}
 }
 
-func sendGET_ALGOR_ALL_STATUS(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendGET_ALGOR_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public GET_ALGOR_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb1))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0xb1)
@@ -426,10 +419,9 @@ func sendGET_ALGOR_ALL_STATUS(macs []string, mqttClientMap map[string]MQTT.Clien
 	}
 }
 
-func sendGET_HARDWARE_ALL_STATUS(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendGET_HARDWARE_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public GET_HARDWARE_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb3))
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			buffer.WriteByte(0xb3)
@@ -449,10 +441,9 @@ func sendGET_HARDWARE_ALL_STATUS(macs []string, mqttClientMap map[string]MQTT.Cl
 	}
 }
 
-func sendMPR(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendMPR(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public sendMPR,mac=%s,cmd=%X", mac, 0x70))
 
 			bs, _ := hex.DecodeString("700a0100199c230019a725001993a30024612900245273002460d8002451f400245b150024558d002462e40022bc9600245f1a00244a9a00245f6e001c69aa")
@@ -473,10 +464,9 @@ func randInt(min, max int) int {
 	return min + rand.Intn(max-min)
 }
 
-func sendErrorCode(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendErrorCode(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("send errorCode %s", mac))
 
 			now := time.Now()
@@ -495,10 +485,9 @@ func sendErrorCode(macs []string, mqttClientMap map[string]MQTT.Client) {
 	}
 }
 
-func sendHardWarePressurePad(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendHardWarePressurePad(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x71))
 
 			newBuffer := bytes.NewBuffer(make([]byte, 0))
@@ -528,10 +517,9 @@ func sendHardWarePressurePad(macs []string, mqttClientMap map[string]MQTT.Client
 	}
 }
 
-func sendHardWareAirPumpCurrent(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendHardWareAirPumpCurrent(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x73))
 
 			bs := []byte{0x73, 4, byte(randInt(0, 1000)), byte(randInt(0, 1000)), 0, 0, byte(randInt(0, 1000)), byte(randInt(0, 1000))}
@@ -543,10 +531,9 @@ func sendHardWareAirPumpCurrent(macs []string, mqttClientMap map[string]MQTT.Cli
 	}
 }
 
-func sendHardWareSolenoidValveTemperature(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendHardWareSolenoidValveTemperature(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x75))
 
 			bs := []byte{0x75, 1, byte(randInt(10, 60)), byte(randInt(10, 60)), byte(randInt(10, 60))}
@@ -563,10 +550,9 @@ func sendHardWareSolenoidValveTemperature(macs []string, mqttClientMap map[strin
 	}
 }
 
-func sendHardWareSolenoidValveCurrent(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendHardWareSolenoidValveCurrent(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x75))
 
 			bs, _ := hex.DecodeString("7401000000000000")
@@ -583,10 +569,9 @@ func sendHardWareSolenoidValveCurrent(macs []string, mqttClientMap map[string]MQ
 	}
 }
 
-func sendHardWareMotherboardTemperature(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendHardWareMotherboardTemperature(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x75))
 
 			bs, _ := hex.DecodeString("7601018a01790121026b03ff")
@@ -716,10 +701,9 @@ func controlMsgRecHandler(client MQTT.Client, msg MQTT.Message) {
 }
 
 // 发布心跳数据包
-func sendHeartBeat(macs []string, mqttClientMap map[string]MQTT.Client) {
+func sendHeartBeat(mqttClientMap map[string]MQTT.Client) {
 	for {
-		for _, mac := range macs {
-			client := mqttClientMap[mac]
+		for mac, client := range mqttClientMap {
 			log.Println(fmt.Sprintf("send heartbeat %s", mac))
 
 			bs := []byte{0x55, 4}
