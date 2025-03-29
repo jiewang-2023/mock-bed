@@ -64,5 +64,6 @@ func timeDemo() {
 
 	fmt.Println("==============================================")
 	bytes := []byte("qrem_guestqrem_guestqrem_guest0")
-	println(hex.EncodeToString(bytes))
+	fmt.Println(hex.EncodeToString(bytes))
+
 }
