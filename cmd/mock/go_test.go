@@ -1,8 +1,9 @@
 package main
 
 import (
-	"mock-bed/pkg/encryption"
 	"testing"
+
+	"mock-bed/pkg/encryption"
 )
 
 func TestNum(t *testing.T) {
@@ -13,6 +14,5 @@ func TestNum(t *testing.T) {
 	println(len(encryptedData))
 
 	for i := 401; i < 800; i++ {
-
 	}
 }

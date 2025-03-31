@@ -10,23 +10,25 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/madflojo/tasks"
 	"log"
 	"math/rand"
-	"mock-bed/pkg/encryption"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/madflojo/tasks"
+
+	"mock-bed/pkg/encryption"
+
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
 const (
-	brokerHost             = "tcp://172.16.4.207:1883" // MQTT 代理服务器地址
-	username               = "mock"                    // MQTT 用户名
-	pwd                    = "mock"                    // MQTT 密码
+	brokerHost             = "tcp://localhost:1883" // MQTT 代理服务器地址
+	username               = "mock"                 // MQTT 用户名
+	pwd                    = "mock"                 // MQTT 密码
 	otaSubTopic            = "qrem/%s/ota"
 	controlSubTopic        = "qrem/%s/control"
 	getBedStatusSubTopic   = "qrem/%s/get_bed_status"
@@ -45,9 +47,11 @@ func main() {
 	// go install mvdan.cc/gofumpt@latest
 	// gofumpt -l -w .
 
-	bedNum := flag.Int("bedNum", 100, "number of beds")
-	//bedNumMax := flag.Int("bedNumMax", 1, "number of beds")
-	//bedNumMin := flag.Int("bedNumMin", 1, "number of beds")
+	bedNum := flag.Int("bedNum", 800, "number of beds")
+	startNum := flag.Int("startNum", -1, "number of beds")
+	endNum := flag.Int("endNum", -1, "number of beds")
+	// bedNumMax := flag.Int("bedNumMax", 1, "number of beds")
+	// bedNumMin := flag.Int("bedNumMin", 1, "number of beds")
 	// 解析命令行参数
 	flag.Parse()
 	fmt.Println("bedNum:", *bedNum)
@@ -64,25 +68,24 @@ func main() {
 	}(file) // 关闭文件
 	log.SetOutput(file)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	macs := make([]string, 0)
-
-	mqttClientMap := make(map[string]MQTT.Client)
-	for i := range *bedNum {
-		//for i := 401; i < 800; i++ {
-		m := fmt.Sprintf("25MM111111110038100000-%d", i)
-		macs = append(macs, m)
-		mqttClientMap[m] = getMqttClient(m)
+	start := 0
+	end := 0
+	if *startNum > 0 && *endNum > 0 {
+		start = *startNum
+		end = *endNum
+	} else {
+		end = *bedNum
 	}
 
+	macs := make([]string, 0)
+	mqttClientMap := make(map[string]MQTT.Client)
 	otaMqttClientMap := make(map[string]MQTT.Client)
-	for i := range *bedNum {
-		//for i := 401; i < 800; i++ {
-		m := fmt.Sprintf("25MM111111110038100000-%d", i)
-		macs = append(macs, m)
-		otaMqttClientMap[m] = getOtaMqttClient("ota-" + m)
+
+	for i := start; i <= end; i++ {
+		mac := fmt.Sprintf("25MM111111110038100000-%d", i)
+		macs = append(macs, mac)
+		mqttClientMap[mac] = getMqttClient(mac)
+		otaMqttClientMap[mac] = getOtaMqttClient("ota-" + mac)
 	}
 
 	// Start the Scheduler
@@ -219,11 +222,12 @@ func main() {
 		},
 	})
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	wg.Wait()
 }
 
 func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x9a))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -264,11 +268,9 @@ func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
 		go token3.Wait()
 
 	}
-
 }
 
 func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x97))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -291,11 +293,9 @@ func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client) {
 		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
 		go token2.Wait()
 	}
-
 }
 
 func sendBodyshape(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x8E))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -318,11 +318,9 @@ func sendBodyshape(mqttClientMap map[string]MQTT.Client) {
 		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
 		go token2.Wait()
 	}
-
 }
 
 func sendPosture(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public sendPosture,mac=%s,cmd=%X", mac, 0x91))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -349,7 +347,6 @@ func sendPosture(mqttClientMap map[string]MQTT.Client) {
 		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
 		go token2.Wait()
 	}
-
 }
 
 func sendMovement(mqttClientMap map[string]MQTT.Client) {
@@ -382,7 +379,6 @@ func sendMovement(mqttClientMap map[string]MQTT.Client) {
 }
 
 func send8E(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x8E))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -511,7 +507,6 @@ func send8E(mqttClientMap map[string]MQTT.Client) {
 		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
 		go token2.Wait()
 	}
-
 }
 
 func sendGET_ALGOR_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
@@ -545,7 +540,6 @@ func sendGET_ALGOR_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
 }
 
 func sendGET_HARDWARE_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public GET_HARDWARE_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb3))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -562,11 +556,9 @@ func sendGET_HARDWARE_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
 		token := client.Publish(fmt.Sprintf(serverAckPubTopic, mac), 0, false, encryptedData)
 		go token.Wait()
 	}
-
 }
 
 func sendMPR(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public sendMPR,mac=%s,cmd=%X", mac, 0x70))
 
@@ -580,7 +572,6 @@ func sendMPR(mqttClientMap map[string]MQTT.Client) {
 		token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
 		go token2.Wait()
 	}
-
 }
 
 func randInt(min, max int) int {
@@ -588,7 +579,6 @@ func randInt(min, max int) int {
 }
 
 func sendErrorCode(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("send errorCode %s", mac))
 
@@ -604,7 +594,6 @@ func sendErrorCode(mqttClientMap map[string]MQTT.Client) {
 		token := client.Publish(fmt.Sprintf(productionTestPubTopic, mac), 0, false, encryptedData)
 		go token.Wait()
 	}
-
 }
 
 func sendHardWarePressurePad(mqttClientMap map[string]MQTT.Client) {
@@ -663,7 +652,6 @@ func sendHardWareSolenoidValveTemperature(mqttClientMap map[string]MQTT.Client) 
 }
 
 func sendHardWareSolenoidValveCurrent(mqttClientMap map[string]MQTT.Client) {
-
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x74))
 
@@ -677,7 +665,6 @@ func sendHardWareSolenoidValveCurrent(mqttClientMap map[string]MQTT.Client) {
 		token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
 		go token2.Wait()
 	}
-
 }
 
 func sendHardWareMotherboardTemperature(mqttClientMap map[string]MQTT.Client) {
@@ -753,12 +740,10 @@ func getOtaMqttClient(mac string) MQTT.Client {
 
 // 连接处理器函数
 func onConnnect(client MQTT.Client) {
-
 }
 
 // 连接处理器函数
 func onConnnect2(client MQTT.Client) {
-
 }
 
 // 消息接收处理器函数
@@ -851,5 +836,4 @@ func sendHeartBeat(mqttClientMap map[string]MQTT.Client) {
 			}
 		}()
 	}
-
 }

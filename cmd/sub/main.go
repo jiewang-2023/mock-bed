@@ -5,9 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"mock-bed/pkg/encryption"
 	"strings"
 	"sync"
+
+	"mock-bed/pkg/encryption"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )

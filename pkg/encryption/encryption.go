@@ -69,6 +69,7 @@ func encrypt2(mode string, content, key, iv []byte) ([]byte, error) {
 
 	return crypted, nil
 }
+
 func Decrypt(content []byte) ([]byte, error) {
 	return decrypt2(aesCBC5P, content, defaultKey, defaultIV)
 }
