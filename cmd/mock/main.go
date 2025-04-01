@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	brokerHost             = "tcp://localhost:1883" // MQTT 代理服务器地址
-	username               = "mock"                 // MQTT 用户名
-	pwd                    = "mock"                 // MQTT 密码
+	brokerHost             = "tcp://172.16.4.207:1883" // MQTT 代理服务器地址
+	username               = "mock"                    // MQTT 用户名
+	pwd                    = "mock"                    // MQTT 密码
 	otaSubTopic            = "qrem/%s/ota"
 	controlSubTopic        = "qrem/%s/control"
 	getBedStatusSubTopic   = "qrem/%s/get_bed_status"
@@ -47,7 +47,7 @@ func main() {
 	// go install mvdan.cc/gofumpt@latest
 	// gofumpt -l -w .
 
-	bedNum := flag.Int("bedNum", 800, "number of beds")
+	bedNum := flag.Int("bedNum", 100, "number of beds")
 	startNum := flag.Int("startNum", -1, "number of beds")
 	endNum := flag.Int("endNum", -1, "number of beds")
 	// bedNumMax := flag.Int("bedNumMax", 1, "number of beds")
@@ -77,16 +77,16 @@ func main() {
 		end = *bedNum
 	}
 
-	macs := make([]string, 0)
 	mqttClientMap := make(map[string]MQTT.Client)
 	otaMqttClientMap := make(map[string]MQTT.Client)
 
-	for i := start; i <= end; i++ {
+	for i := start; i < end; i++ {
 		mac := fmt.Sprintf("25MM111111110038100000-%d", i)
-		macs = append(macs, mac)
 		mqttClientMap[mac] = getMqttClient(mac)
 		otaMqttClientMap[mac] = getOtaMqttClient("ota-" + mac)
 	}
+
+	fmt.Printf("start %d beds", len(mqttClientMap))
 
 	// Start the Scheduler
 	scheduler := tasks.New()
@@ -147,7 +147,7 @@ func main() {
 	})
 
 	scheduler.Add(&tasks.Task{
-		Interval: 500 * time.Millisecond,
+		Interval: 90 * time.Millisecond,
 		TaskFunc: func() error {
 			sendMPR(mqttClientMap)
 			return nil
