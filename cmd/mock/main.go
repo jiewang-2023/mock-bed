@@ -15,8 +15,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/panjf2000/ants/v2"
 
 	"github.com/madflojo/tasks"
 
@@ -86,7 +87,11 @@ func main() {
 		otaMqttClientMap[mac] = getOtaMqttClient("ota-" + mac)
 	}
 
-	fmt.Printf("start %d beds", len(mqttClientMap))
+	size := len(mqttClientMap)
+	fmt.Printf("start %d beds", size)
+
+	p, _ := ants.NewPool(size*15, ants.WithPreAlloc(true))
+	defer p.Release()
 
 	// Start the Scheduler
 	scheduler := tasks.New()
@@ -95,21 +100,21 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 10 * time.Second,
 		TaskFunc: func() error {
-			sendHeartBeat(mqttClientMap)
+			sendHeartBeat(mqttClientMap, p)
 			return nil
 		},
 	})
 	scheduler.Add(&tasks.Task{
 		Interval: 3 * time.Second,
 		TaskFunc: func() error {
-			sendHardWareMotherboardTemperature(mqttClientMap)
+			sendHardWareMotherboardTemperature(mqttClientMap, p)
 			return nil
 		},
 	})
 	scheduler.Add(&tasks.Task{
 		Interval: 1 * time.Second,
 		TaskFunc: func() error {
-			sendHardWareSolenoidValveTemperature(mqttClientMap)
+			sendHardWareSolenoidValveTemperature(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -117,7 +122,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 1 * time.Second,
 		TaskFunc: func() error {
-			sendHardWareAirPumpCurrent(mqttClientMap)
+			sendHardWareAirPumpCurrent(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -125,7 +130,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 72 * time.Millisecond,
 		TaskFunc: func() error {
-			sendHardWarePressurePad(mqttClientMap)
+			sendHardWarePressurePad(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -133,7 +138,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 1 * time.Second,
 		TaskFunc: func() error {
-			sendHardWareSolenoidValveCurrent(mqttClientMap)
+			sendHardWareSolenoidValveCurrent(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -141,7 +146,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 10 * time.Second,
 		TaskFunc: func() error {
-			sendErrorCode(mqttClientMap)
+			sendErrorCode(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -149,7 +154,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 90 * time.Millisecond,
 		TaskFunc: func() error {
-			sendMPR(mqttClientMap)
+			sendMPR(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -157,7 +162,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 15 * time.Second,
 		TaskFunc: func() error {
-			sendGET_HARDWARE_ALL_STATUS(mqttClientMap)
+			sendGET_HARDWARE_ALL_STATUS(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -165,7 +170,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 15 * time.Second,
 		TaskFunc: func() error {
-			sendGET_ALGOR_ALL_STATUS(mqttClientMap)
+			sendGET_ALGOR_ALL_STATUS(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -173,7 +178,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 30 * time.Second,
 		TaskFunc: func() error {
-			send8E(mqttClientMap)
+			send8E(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -181,7 +186,7 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 5 * time.Second,
 		TaskFunc: func() error {
-			sendMovement(mqttClientMap)
+			sendMovement(mqttClientMap, p)
 			return nil
 		},
 	})
@@ -189,45 +194,49 @@ func main() {
 	scheduler.Add(&tasks.Task{
 		Interval: 30 * time.Second,
 		TaskFunc: func() error {
-			sendPosture(mqttClientMap)
+			sendPosture(mqttClientMap, p)
 			return nil
 		},
 	})
 	scheduler.Add(&tasks.Task{
 		Interval: 1 * time.Second,
 		TaskFunc: func() error {
-			sendBodyshape(mqttClientMap)
+			sendBodyshape(mqttClientMap, p)
 			return nil
 		},
 	})
 	scheduler.Add(&tasks.Task{
 		Interval: 7 * time.Second,
 		TaskFunc: func() error {
-			sendAdaptiveActive(mqttClientMap)
+			sendAdaptiveActive(mqttClientMap, p)
 			return nil
 		},
 	})
 	scheduler.Add(&tasks.Task{
 		Interval: 1 * time.Second,
 		TaskFunc: func() error {
-			sendHrHRVBR(mqttClientMap, 0x01)
+			sendHrHRVBR(mqttClientMap, 0x01, p)
 			return nil
 		},
 	})
 	scheduler.Add(&tasks.Task{
 		Interval: 1 * time.Second,
 		TaskFunc: func() error {
-			sendHrHRVBR(mqttClientMap, 0x02)
+			sendHrHRVBR(mqttClientMap, 0x02, p)
 			return nil
 		},
 	})
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	wg.Wait()
+	for {
+		fmt.Println(fmt.Sprintf("cap=%d,free=%d,waiting=%d,running=%d,", p.Cap(), p.Free(), p.Waiting(), p.Running()))
+		time.Sleep(1 * time.Second)
+	}
+	// var wg sync.WaitGroup
+	// wg.Add(1)
+	// wg.Wait()
 }
 
-func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
+func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x9a))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -240,8 +249,10 @@ func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
 		bs := buffer.Bytes()
 
 		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
 		buffer2 := bytes.NewBuffer(make([]byte, 0))
 		buffer2.WriteByte(0x9b)
@@ -252,8 +263,10 @@ func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
 		buffer2.Write(bytedata2)
 		bs2 := buffer2.Bytes()
 		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 
 		buffer3 := bytes.NewBuffer(make([]byte, 0))
 		buffer3.WriteByte(0x9c)
@@ -264,13 +277,15 @@ func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte) {
 		buffer3.Write(bytedata3)
 		bs3 := buffer3.Bytes()
 		encryptedData3, _ := encryption.Encrypt(bs3)
-		token3 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData3)
-		go token3.Wait()
+		p.Submit(func() {
+			token3 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData3)
+			token3.Wait()
+		})
 
 	}
 }
 
-func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client) {
+func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x97))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -280,8 +295,10 @@ func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client) {
 		buffer.WriteString(jsonStr)
 		bs := buffer.Bytes()
 		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
 		buffer2 := bytes.NewBuffer(make([]byte, 0))
 		buffer2.WriteByte(0x97)
@@ -290,12 +307,14 @@ func sendAdaptiveActive(mqttClientMap map[string]MQTT.Client) {
 		buffer2.WriteString(jsonStr2)
 		bs2 := buffer2.Bytes()
 		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 	}
 }
 
-func sendBodyshape(mqttClientMap map[string]MQTT.Client) {
+func sendBodyshape(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x8E))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -305,8 +324,10 @@ func sendBodyshape(mqttClientMap map[string]MQTT.Client) {
 		buffer.WriteString(jsonStr)
 		bs := buffer.Bytes()
 		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
 		buffer2 := bytes.NewBuffer(make([]byte, 0))
 		buffer2.WriteByte(0x95)
@@ -315,12 +336,14 @@ func sendBodyshape(mqttClientMap map[string]MQTT.Client) {
 		buffer2.WriteString(jsonStr2)
 		bs2 := buffer2.Bytes()
 		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 	}
 }
 
-func sendPosture(mqttClientMap map[string]MQTT.Client) {
+func sendPosture(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public sendPosture,mac=%s,cmd=%X", mac, 0x91))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -332,8 +355,10 @@ func sendPosture(mqttClientMap map[string]MQTT.Client) {
 		buffer.Write(bytedata)
 		bs := buffer.Bytes()
 		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
 		buffer2 := bytes.NewBuffer(make([]byte, 0))
 		buffer2.WriteByte(0x93)
@@ -344,12 +369,14 @@ func sendPosture(mqttClientMap map[string]MQTT.Client) {
 		buffer2.Write(bytedata2)
 		bs2 := buffer2.Bytes()
 		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 	}
 }
 
-func sendMovement(mqttClientMap map[string]MQTT.Client) {
+func sendMovement(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public sendMovement,mac=%s,cmd=%X", mac, 0x91))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -361,8 +388,10 @@ func sendMovement(mqttClientMap map[string]MQTT.Client) {
 		buffer.Write(bytedata)
 		bs := buffer.Bytes()
 		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
 		buffer2 := bytes.NewBuffer(make([]byte, 0))
 		buffer2.WriteByte(0x91)
@@ -373,12 +402,14 @@ func sendMovement(mqttClientMap map[string]MQTT.Client) {
 		buffer2.Write(bytedata2)
 		bs2 := buffer2.Bytes()
 		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 	}
 }
 
-func send8E(mqttClientMap map[string]MQTT.Client) {
+func send8E(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
 		log.Println(fmt.Sprintf("public send8E,mac=%s,cmd=%X", mac, 0x8E))
 		buffer := bytes.NewBuffer(make([]byte, 0))
@@ -495,8 +526,11 @@ func send8E(mqttClientMap map[string]MQTT.Client) {
 		buffer.WriteString(jsonStr)
 		bs := buffer.Bytes()
 		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+
+		p.Submit(func() {
+			token := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
 		buffer2 := bytes.NewBuffer(make([]byte, 0))
 		buffer2.WriteByte(0x8E)
@@ -504,73 +538,84 @@ func send8E(mqttClientMap map[string]MQTT.Client) {
 		buffer2.WriteString(jsonStr)
 		bs2 := buffer2.Bytes()
 		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			token2 := client.Publish(fmt.Sprintf(bodyInfoPubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 	}
 }
 
-func sendGET_ALGOR_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
+func sendGET_ALGOR_ALL_STATUS(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public GET_ALGOR_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb1))
-		buffer := bytes.NewBuffer(make([]byte, 0))
-		buffer.WriteByte(0xb1)
-		buffer.WriteByte(0x00)
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public GET_ALGOR_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb1))
+			buffer := bytes.NewBuffer(make([]byte, 0))
+			buffer.WriteByte(0xb1)
+			buffer.WriteByte(0x00)
 
-		dataMap := make(map[string]any)
-		dataMap["pillowFlag"] = 1
-		dataMap["adaptiveMode"] = 1
-		dataMap["shieldAdaptive"] = 1
-		dataMap["floatingMode"] = 1
-		dataMap["welcomeMode"] = 1
-		dataMap["runStatus"] = 1
-		dataMap["posture"] = 1
-		dataMap["bedExitStatus"] = 1
-		dataMap["bedModel"] = "EK-E"
-		dataMap["firmwareVersion"] = "M001-V1.3.01-2025-01-16 17:28:33"
-		dataMap["storage"] = "1024 MB"
-		bytedata, _ := json.Marshal(dataMap)
+			dataMap := make(map[string]any)
+			dataMap["pillowFlag"] = 1
+			dataMap["adaptiveMode"] = 1
+			dataMap["shieldAdaptive"] = 1
+			dataMap["floatingMode"] = 1
+			dataMap["welcomeMode"] = 1
+			dataMap["runStatus"] = 1
+			dataMap["posture"] = 1
+			dataMap["bedExitStatus"] = 1
+			dataMap["bedModel"] = "EK-E"
+			dataMap["firmwareVersion"] = "M001-V1.3.01-2025-01-16 17:28:33"
+			dataMap["storage"] = "1024 MB"
+			bytedata, _ := json.Marshal(dataMap)
 
-		buffer.Write(bytedata)
+			buffer.Write(bytedata)
 
-		bs := buffer.Bytes()
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(serverAckPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+			bs := buffer.Bytes()
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(serverAckPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 	}
 }
 
-func sendGET_HARDWARE_ALL_STATUS(mqttClientMap map[string]MQTT.Client) {
+func sendGET_HARDWARE_ALL_STATUS(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public GET_HARDWARE_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb3))
-		buffer := bytes.NewBuffer(make([]byte, 0))
-		buffer.WriteByte(0xb3)
-		buffer.WriteByte(0x00)
-		buffer.WriteByte(0x01)
-		buffer.WriteByte(0x05)
-		buffer.WriteString("qrem_guestqrem_guestqrem_guest0")
-		buffer.WriteByte(0x00)
-		buffer.WriteByte(0x01)
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public GET_HARDWARE_ALL_STATUS,mac=%s,cmd=%X", mac, 0xb3))
+			buffer := bytes.NewBuffer(make([]byte, 0))
+			buffer.WriteByte(0xb3)
+			buffer.WriteByte(0x00)
+			buffer.WriteByte(0x01)
+			buffer.WriteByte(0x05)
+			buffer.WriteString("qrem_guestqrem_guestqrem_guest0")
+			buffer.WriteByte(0x00)
+			buffer.WriteByte(0x01)
 
-		bs := buffer.Bytes()
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(serverAckPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+			bs := buffer.Bytes()
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(serverAckPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 	}
 }
 
-func sendMPR(mqttClientMap map[string]MQTT.Client) {
+func sendMPR(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public sendMPR,mac=%s,cmd=%X", mac, 0x70))
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public sendMPR,mac=%s,cmd=%X", mac, 0x70))
+			bs, _ := hex.DecodeString("700a0100199c230019a725001993a30024612900245273002460d8002451f400245b150024558d002462e40022bc9600245f1a00244a9a00245f6e001c69aa")
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
-		bs, _ := hex.DecodeString("700a0100199c230019a725001993a30024612900245273002460d8002451f400245b150024558d002462e40022bc9600245f1a00244a9a00245f6e001c69aa")
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public sendMPR,mac=%s,cmd=%X", mac, 0x70))
+			bs2, _ := hex.DecodeString("7009010019c3cc001e1a05001da12700263da7002619b000263c5e001d6bda001da1b80024752f00244b64002444330024b9a3001a18ae0019cb6d0019d4b7")
+			encryptedData2, _ := encryption.Encrypt(bs2)
+			token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 
-		bs2, _ := hex.DecodeString("7009010019c3cc001e1a05001da12700263da7002619b000263c5e001d6bda001da1b80024752f00244b64002444330024b9a3001a18ae0019cb6d0019d4b7")
-		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
 	}
 }
 
@@ -578,113 +623,128 @@ func randInt(min, max int) int {
 	return min + rand.Intn(max-min)
 }
 
-func sendErrorCode(mqttClientMap map[string]MQTT.Client) {
+func sendErrorCode(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("send errorCode %s", mac))
-
-		now := time.Now()
-		yearStr := strconv.Itoa(now.Year())
-		yearLastTwo, _ := strconv.Atoi(yearStr[len(yearStr)-2:])
-		bs := []byte{0xec, 4, byte(randInt(0x01, 0x04)), 1, byte(randInt(0x01, 0x0f)), byte(yearLastTwo), byte(now.Month()), byte(now.Day()), byte(now.Hour()), byte(now.Minute()), byte(now.Second())}
-		encryptedData, err := encryption.Encrypt(bs)
-		if err != nil {
-			fmt.Println("Encrypt error:", err)
-		}
-
-		token := client.Publish(fmt.Sprintf(productionTestPubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("send errorCode %s", mac))
+			now := time.Now()
+			yearStr := strconv.Itoa(now.Year())
+			yearLastTwo, _ := strconv.Atoi(yearStr[len(yearStr)-2:])
+			bs := []byte{0xec, 4, byte(randInt(0x01, 0x04)), 1, byte(randInt(0x01, 0x0f)), byte(yearLastTwo), byte(now.Month()), byte(now.Day()), byte(now.Hour()), byte(now.Minute()), byte(now.Second())}
+			encryptedData, err := encryption.Encrypt(bs)
+			if err != nil {
+				fmt.Println("Encrypt error:", err)
+			}
+			token := client.Publish(fmt.Sprintf(productionTestPubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 	}
 }
 
-func sendHardWarePressurePad(mqttClientMap map[string]MQTT.Client) {
+func sendHardWarePressurePad(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x71))
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x71))
+			newBuffer := bytes.NewBuffer(make([]byte, 0))
+			newBuffer.WriteByte(0x71)
+			newBuffer.WriteByte(0x01)
+			for range 1024 {
+				newBuffer.WriteByte(byte(randInt(0, 126)))
+			}
+			dataArr := newBuffer.Bytes()
+			encryptedData, _ := encryption.Encrypt(dataArr)
+			token := client.Publish(fmt.Sprintf(pressurePubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
+		p.Submit(func() {
+			newBuffer2 := bytes.NewBuffer(make([]byte, 0))
+			newBuffer2.WriteByte(0x71)
+			newBuffer2.WriteByte(0x02)
+			for range 1024 {
+				newBuffer2.WriteByte(byte(randInt(0, 80)))
+			}
+			dataArr2 := newBuffer2.Bytes()
+			encryptedData2, _ := encryption.Encrypt(dataArr2)
+			token2 := client.Publish(fmt.Sprintf(pressurePubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 
-		newBuffer := bytes.NewBuffer(make([]byte, 0))
-		newBuffer.WriteByte(0x71)
-		newBuffer.WriteByte(0x01)
-		for range 1024 {
-			newBuffer.WriteByte(byte(randInt(0, 126)))
-		}
-		dataArr := newBuffer.Bytes()
-		encryptedData, _ := encryption.Encrypt(dataArr)
-		token := client.Publish(fmt.Sprintf(pressurePubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
-
-		newBuffer2 := bytes.NewBuffer(make([]byte, 0))
-		newBuffer2.WriteByte(0x71)
-		newBuffer2.WriteByte(0x02)
-		for range 1024 {
-			newBuffer2.WriteByte(byte(randInt(0, 80)))
-		}
-		dataArr2 := newBuffer2.Bytes()
-		encryptedData2, _ := encryption.Encrypt(dataArr2)
-		token2 := client.Publish(fmt.Sprintf(pressurePubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
 	}
 }
 
-func sendHardWareAirPumpCurrent(mqttClientMap map[string]MQTT.Client) {
+func sendHardWareAirPumpCurrent(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x73))
-
-		bs := []byte{0x73, 4, byte(randInt(0, 1000)), byte(randInt(0, 1000)), 0, 0, byte(randInt(0, 1000)), byte(randInt(0, 1000))}
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x73))
+			bs := []byte{0x73, 4, byte(randInt(0, 1000)), byte(randInt(0, 1000)), 0, 0, byte(randInt(0, 1000)), byte(randInt(0, 1000))}
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 	}
 }
 
-func sendHardWareSolenoidValveTemperature(mqttClientMap map[string]MQTT.Client) {
+func sendHardWareSolenoidValveTemperature(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x75))
-
-		bs := []byte{0x75, 1, byte(randInt(10, 60)), byte(randInt(10, 60)), byte(randInt(10, 60))}
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
-
-		bs2 := []byte{0x75, 2, byte(randInt(10, 80)), byte(randInt(10, 80)), byte(randInt(10, 80))}
-		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x75))
+			bs := []byte{0x75, 1, byte(randInt(10, 60)), byte(randInt(10, 60)), byte(randInt(10, 60))}
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x75))
+			bs2 := []byte{0x75, 2, byte(randInt(10, 80)), byte(randInt(10, 80)), byte(randInt(10, 80))}
+			encryptedData2, _ := encryption.Encrypt(bs2)
+			token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 	}
 }
 
-func sendHardWareSolenoidValveCurrent(mqttClientMap map[string]MQTT.Client) {
+func sendHardWareSolenoidValveCurrent(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x74))
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x74))
+			bs, _ := hex.DecodeString("7401000000000000")
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
-		bs, _ := hex.DecodeString("7401000000000000")
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x74))
+			bs2, _ := hex.DecodeString("7402000000000000")
+			encryptedData2, _ := encryption.Encrypt(bs2)
+			token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
+			token2.Wait()
+		})
 
-		bs2, _ := hex.DecodeString("7402000000000000")
-		encryptedData2, _ := encryption.Encrypt(bs2)
-		token2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
-		go token2.Wait()
 	}
 }
 
-func sendHardWareMotherboardTemperature(mqttClientMap map[string]MQTT.Client) {
+func sendHardWareMotherboardTemperature(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x76))
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x76))
+			bs, _ := hex.DecodeString("7601018a01790121026b03ff")
+			encryptedData, _ := encryption.Encrypt(bs)
+			token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
+			token.Wait()
+		})
 
-		bs, _ := hex.DecodeString("7601018a01790121026b03ff")
-		encryptedData, _ := encryption.Encrypt(bs)
-		token := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData)
-		go token.Wait()
-
-		bs2, _ := hex.DecodeString("76020241022b017c01f30267")
-		encryptedData2, _ := encryption.Encrypt(bs2)
-		t2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
-		go func() {
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("public topic=hardware,mac=%s,cmd=%X", mac, 0x76))
+			bs2, _ := hex.DecodeString("76020241022b017c01f30267")
+			encryptedData2, _ := encryption.Encrypt(bs2)
+			t2 := client.Publish(fmt.Sprintf(hardwarePubTopic, mac), 0, false, encryptedData2)
 			_ = t2.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
 			if t2.Error() != nil {
 				log.Println(t2.Error()) // Use your preferred logging technique (or just fmt.Printf)
 			}
-		}()
+		})
+
 	}
 }
 
@@ -818,22 +878,22 @@ func controlMsgRecHandler(client MQTT.Client, msg MQTT.Message) {
 }
 
 // 发布心跳数据包
-func sendHeartBeat(mqttClientMap map[string]MQTT.Client) {
+func sendHeartBeat(mqttClientMap map[string]MQTT.Client, p *ants.Pool) {
 	for mac, client := range mqttClientMap {
-		log.Println(fmt.Sprintf("send heartbeat %s", mac))
+		p.Submit(func() {
+			log.Println(fmt.Sprintf("send heartbeat %s", mac))
 
-		bs := []byte{0x55, 4}
-		encryptedData, err := encryption.Encrypt(bs)
-		if err != nil {
-			fmt.Println("Encrypt error:", err)
-		}
+			bs := []byte{0x55, 4}
+			encryptedData, err := encryption.Encrypt(bs)
+			if err != nil {
+				fmt.Println("Encrypt error:", err)
+			}
 
-		t := client.Publish(fmt.Sprintf(runStatusPubTopic, mac), 0, false, encryptedData)
-		go func() {
+			t := client.Publish(fmt.Sprintf(runStatusPubTopic, mac), 0, false, encryptedData)
 			_ = t.Wait() // Can also use '<-t.Done()' in releases > 1.2.0
 			if t.Error() != nil {
 				log.Println(t.Error()) // Use your preferred logging technique (or just fmt.Printf)
 			}
-		}()
+		})
 	}
 }
