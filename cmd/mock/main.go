@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
@@ -89,8 +90,9 @@ func main() {
 
 	size := len(mqttClientMap)
 	fmt.Printf("start %d beds", size)
+	fmt.Println()
 
-	p, _ := ants.NewPool(size*15, ants.WithPreAlloc(true))
+	p, _ := ants.NewPool(size*10, ants.WithPreAlloc(true), ants.WithNonblocking(false))
 	defer p.Release()
 
 	// Start the Scheduler
@@ -227,13 +229,17 @@ func main() {
 		},
 	})
 
-	for {
-		fmt.Println(fmt.Sprintf("cap=%d,free=%d,waiting=%d,running=%d,", p.Cap(), p.Free(), p.Waiting(), p.Running()))
-		time.Sleep(1 * time.Second)
-	}
-	// var wg sync.WaitGroup
-	// wg.Add(1)
-	// wg.Wait()
+	scheduler.Add(&tasks.Task{
+		Interval: 1 * time.Second,
+		TaskFunc: func() error {
+			fmt.Println(fmt.Sprintf("cap=%d,free=%d,waiting=%d,running=%d,", p.Cap(), p.Free(), p.Waiting(), p.Running()))
+			return nil
+		},
+	})
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	wg.Wait()
 }
 
 func sendHrHRVBR(mqttClientMap map[string]MQTT.Client, opt byte, p *ants.Pool) {
